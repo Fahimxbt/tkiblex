@@ -5,9 +5,9 @@ import asyncio
 import sys
 
 # ========== HARDCODED CONFIG ==========
-STRING_SESSION = '1BVtsOKcBu3Q1J_DVpoYr2eAkqIIz-lcga6QwZ_elbq1JsKXF8qTmgVXYv3ykke8dYg4Aqp1ZeirxcBvwlin1QS3PNOqOe9J0mmZX1uTVoWDcQb-TzmxZnOMyrmwv4Wotj82hIiNTk6IvrxED6rA6XshXBG8ST_2PN78vQX651KnINFs_MwtbIPP5CZHirfnRN2cdeT84dTtL27ODNgfXe-Gn_8cYLFQz3nEX6NqxZxoJAzvtapi9oVkt0hOZBHmrHdX3VoJ36tWm-ucJmzXNtnirw3jUQ9kqitXhh8WVcSui2ZgeDZ9MYmgl0UX970buyBbySeLPuo2zDsmb8A6i6zb06lhxtXc='
-API_ID = 31653365
-API_HASH = '46fa4b3be1dd2f89dc84d447cf3fc820'
+STRING_SESSION = '1BVtsOKcBu3Q1J_DVpoYr2eAkqIIz-lcga6QwZ_elbq1JsKXF8qTmgVXYv3irxcBvwlin1QS3PNOqOe9J0mmZX1uTVoWDcQb-TzmxZnOMyrmwv4Wotj82hIiNTk6IvrxED6rA6XshXBG8ST_2PN78vQX651KnINFs_MwtbIPP5CZHirfnRN2cdeT84dTtL27ODNgfXe-Gn_8cYLFQz3nEX6NqxZxoJAzvtapi9oVkt0hOZBHmrHdX3VoJ36tWm-ucJmzXNtnirw3jUQ9kqitXhh8WVcSui2ZgeDZ9MYmgl0UX970buyBbySeLPuo2zDsmb8A6i6zb06lhxtXc='
+API_ID = 316565
+API_HASH = '46fa4b3be12f89dc84d447cf3fc820'
 # ======================================
 
 client = TelegramClient(StringSession(STRING_SESSION), API_ID, API_HASH)
