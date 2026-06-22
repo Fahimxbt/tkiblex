@@ -25,8 +25,6 @@ client = TelegramClient(StringSession(STRING_SESSION), API_ID, API_HASH)
 
 bot_entity = None
 sticker_msg_id = None
-heyyy_msg_id = None
-f_msg_id = None
 
 match_active = False
 promo_sent = False
@@ -87,28 +85,22 @@ async def safe_click(message, text, retries=3):
 
 
 async def find_messages():
-    global sticker_msg_id, heyyy_msg_id, f_msg_id
+    global sticker_msg_id
     try:
         msgs = await client.get_messages('me', limit=50)
         for m in msgs:
             if m.sticker and not sticker_msg_id:
                 sticker_msg_id = m.id
                 print("[+] Sticker found!")
-            if m.text and m.text.lower() == 'heyyy' and not heyyy_msg_id:
-                heyyy_msg_id = m.id
-                print("[+] 'heyyy' message found!")
-            if m.text and m.text.upper() == 'F' and not f_msg_id:
-                f_msg_id = m.id
-                print("[+] 'F' message found!")
 
-        if all([sticker_msg_id, heyyy_msg_id, f_msg_id]):
-            print("[+] All messages found!")
+        if sticker_msg_id:
+            print("[+] Sticker message found!")
             return True
 
     except Exception as e:
         print(f"[!] Find error: {e}")
 
-    print("[!] Send 'heyyy', 'F', and a sticker to Saved Messages first!")
+    print("[!] Send a sticker to Saved Messages first!")
     return False
 
 
@@ -174,40 +166,10 @@ async def send_promo():
 
     async with sending_lock:
         promo_cancelled = False
-        print("[*] Starting forward sequence...")
+        print("[*] Starting sticker forward...")
 
         try:
-            # Step 1: Forward "heyyy"
-            if promo_cancelled:
-                print("[!] Promo cancelled before heyyy")
-                return
-
-            if heyyy_msg_id:
-                await safe_forward_messages(bot_entity, heyyy_msg_id, 'me')
-                print("[+] Forwarded: heyyy")
-            else:
-                await safe_send_message(bot_entity, "heyyy")
-                print("[+] Sent: heyyy")
-
-            print("[*] Waiting 4 seconds...")
-            await asyncio.sleep(4)
-
-            # Step 2: Forward "F"
-            if promo_cancelled:
-                print("[!] Promo cancelled before F")
-                return
-
-            if f_msg_id:
-                await safe_forward_messages(bot_entity, f_msg_id, 'me')
-                print("[+] Forwarded: F")
-            else:
-                await safe_send_message(bot_entity, "F")
-                print("[+] Sent: F")
-
-            print("[*] Waiting 6 seconds...")
-            await asyncio.sleep(6)
-
-            # Step 3: Forward sticker
+            # Forward sticker only
             if promo_cancelled:
                 print("[!] Promo cancelled before sticker")
                 return
@@ -315,8 +277,8 @@ async def main():
     msgs_found = await find_messages()
 
     if not msgs_found:
-        print("[!] WARNING: Some messages not found in Saved Messages!")
-        print("[!] The bot will use text fallback for missing messages.")
+        print("[!] WARNING: Sticker not found in Saved Messages!")
+        print("[!] The bot will use text fallback for missing sticker.")
 
     await safe_send_message(bot_entity, '/next')
 
