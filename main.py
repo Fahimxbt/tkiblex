@@ -30,6 +30,7 @@ promo_sent = False
 sending_lock = asyncio.Lock()
 promo_cancelled = False
 finding_lock = asyncio.Lock()
+sticker_just_sent = False
 
 MIN_PARTNER_INTERVAL = 15
 last_partner_time = 0
@@ -104,7 +105,7 @@ async def find_messages():
 
 
 async def click_next():
-    global match_active, promo_sent, last_partner_time
+    global match_active, promo_sent, last_partner_time, sticker_just_sent
 
     if finding_lock.locked():
         print("[*] Already finding partner, skipping...")
@@ -139,6 +140,7 @@ async def click_next():
                                     print("[→] Next clicked")
                                     match_active = False
                                     promo_sent = False
+                                    sticker_just_sent = False
                                     last_partner_time = asyncio.get_event_loop().time()
                                     await asyncio.sleep(3)
                                     return True
@@ -151,13 +153,14 @@ async def click_next():
         print("[→] /next sent (fallback)")
         match_active = False
         promo_sent = False
+        sticker_just_sent = False
         last_partner_time = asyncio.get_event_loop().time()
         await asyncio.sleep(3)
         return True
 
 
 async def send_promo():
-    global promo_sent, promo_cancelled
+    global promo_sent, promo_cancelled, sticker_just_sent
 
     if sending_lock.locked() or promo_sent:
         print("[*] Already sending or already sent, skipping...")
@@ -165,6 +168,7 @@ async def send_promo():
 
     async with sending_lock:
         promo_cancelled = False
+        sticker_just_sent = False
         print("[*] Starting forward sequence...")
 
         try:
@@ -180,9 +184,9 @@ async def send_promo():
                 await safe_send_message(bot_entity, "heyyy")
                 print("[+] Sent: heyyy")
 
-            # Wait 2 seconds
-            print("[*] Waiting 2 seconds...")
-            await asyncio.sleep(2)
+            # Wait 3 seconds
+            print("[*] Waiting 3 seconds...")
+            await asyncio.sleep(3)
 
             # Step 2: Forward "F"
             if promo_cancelled:
@@ -196,11 +200,11 @@ async def send_promo():
                 await safe_send_message(bot_entity, "F")
                 print("[+] Sent: F")
 
-            # Wait 2 seconds
-            print("[*] Waiting 2 seconds...")
-            await asyncio.sleep(2)
+            # Wait 4 seconds
+            print("[*] Waiting 4 seconds...")
+            await asyncio.sleep(4)
 
-            # Step 3: Forward sticker and immediately skip
+            # Step 3: Forward sticker
             if promo_cancelled:
                 print("[!] Promo cancelled before sticker")
                 return
@@ -212,19 +216,28 @@ async def send_promo():
                 await safe_send_message(bot_entity, "💜 @chatxbt_bot\nhttps://t.me/chatxbt_bot")
                 print("[+] Text promo sent!")
 
-            # Immediately skip after sticker
-            print("[*] Skipping immediately...")
+            sticker_just_sent = True
             promo_sent = True
-            print("[✓] Promo sequence complete!")
+            print("[✓] Sticker sent, waiting 3s before skip...")
+
+            # Wait 3 seconds after sticker, but listen for partner skip
+            for i in range(30):  # 30 * 0.1s = 3 seconds
+                if promo_cancelled or not match_active:
+                    print("[!] Partner skipped during post-sticker wait, aborting wait")
+                    return
+                await asyncio.sleep(0.1)
+
+            print("[*] 3s wait done, proceeding to next...")
 
         except Exception as e:
             print(f"[!] Send error: {e}")
             promo_sent = False
+            sticker_just_sent = False
 
 
 @client.on(events.NewMessage(chats='@tikible_bot'))
 async def handler(event):
-    global match_active, promo_sent, promo_cancelled
+    global match_active, promo_sent, promo_cancelled, sticker_just_sent
 
     text = event.text or ''
 
@@ -234,6 +247,7 @@ async def handler(event):
     # ========== PARTNER LEFT THE CHAT ==========
     if 'partner has left' in text.lower() or 'partner ended' in text.lower():
         print("[✓] Partner left the chat!")
+        was_active = match_active
         match_active = False
         promo_sent = False
 
@@ -245,6 +259,12 @@ async def handler(event):
                     break
                 await asyncio.sleep(0.1)
 
+        # If sticker was just sent and partner left, dont double-click next
+        if sticker_just_sent and was_active:
+            print("[*] Partner left right after sticker, already handled")
+            sticker_just_sent = False
+            return
+
         await asyncio.sleep(2)
         await click_next()
         return
@@ -254,6 +274,7 @@ async def handler(event):
         print("[✓] You left the chat")
         match_active = False
         promo_sent = False
+        sticker_just_sent = False
         await asyncio.sleep(2)
         await click_next()
         return
@@ -264,13 +285,16 @@ async def handler(event):
         match_active = True
         promo_sent = False
         promo_cancelled = False
+        sticker_just_sent = False
 
         await asyncio.sleep(1)
         await send_promo()
 
-        # After promo (sticker sent), click next with bot_id wait
-        if not promo_cancelled:
+        # After promo (sticker sent + 3s wait), click next with bot_id wait
+        if not promo_cancelled and match_active:
             await click_next()
+        elif not match_active:
+            print("[*] Match already ended, skip click_next")
         else:
             print("[!] Promo cancelled, finding next...")
             await asyncio.sleep(1)
@@ -282,6 +306,7 @@ async def handler(event):
         print("[...] Searching...")
         match_active = False
         promo_sent = False
+        sticker_just_sent = False
         return
 
     # ========== PARTNER SENT MESSAGE DURING MATCH ==========
@@ -289,8 +314,10 @@ async def handler(event):
         print("[+] Partner messaged first!")
         await send_promo()
 
-        if not promo_cancelled:
+        if not promo_cancelled and match_active:
             await click_next()
+        elif not match_active:
+            print("[*] Match ended during promo, skip click_next")
         else:
             print("[!] Promo cancelled, finding next...")
             await asyncio.sleep(1)
