@@ -104,6 +104,26 @@ async def find_messages():
     return False
 
 
+async def dismiss_rating():
+    """Click Like or Dislike to dismiss the rating screen."""
+    try:
+        msgs = await client.get_messages(bot_entity, limit=5)
+        for m in msgs:
+            if m.reply_markup and m.reply_markup.rows:
+                for row in m.reply_markup.rows:
+                    for btn in row.buttons:
+                        btn_text = btn.text or ''
+                        if 'like' in btn_text.lower() or 'dislike' in btn_text.lower():
+                            result = await safe_click(m, btn.text)
+                            if result:
+                                print(f"[→] Rating dismissed: {btn_text}")
+                                await asyncio.sleep(2)
+                                return True
+    except Exception as e:
+        print(f"[!] Dismiss rating error: {e}")
+    return False
+
+
 async def click_next():
     global match_active, promo_sent, last_partner_time, sticker_just_sent
 
@@ -144,7 +164,6 @@ async def click_next():
                                     last_partner_time = asyncio.get_event_loop().time()
                                     await asyncio.sleep(3)
                                     return True
-                                continue
         except Exception as e:
             print(f"[!] get_messages error: {e}")
 
@@ -266,6 +285,8 @@ async def handler(event):
             return
 
         await asyncio.sleep(2)
+        # Dismiss rating screen if present
+        await dismiss_rating()
         await click_next()
         return
 
@@ -276,6 +297,8 @@ async def handler(event):
         promo_sent = False
         sticker_just_sent = False
         await asyncio.sleep(2)
+        # Dismiss rating screen if present
+        await dismiss_rating()
         await click_next()
         return
 
