@@ -5,17 +5,14 @@ import asyncio
 import os
 import sys
 import random
-import time
 
 # ========== CONFIG FROM ENVIRONMENT VARIABLES ==========
 STRING_SESSION = os.environ.get('STRING_SESSION', '')
 API_ID = int(os.environ.get('API_ID', '0'))
 API_HASH = os.environ.get('API_HASH', '')
-# Optional: set BOT_ID to a unique number (1-5) for each bot to stagger timing
-BOT_ID = int(os.environ.get('BOT_ID', 1))
+BOT_ID = int(os.environ.get('BOT_ID', '1'))
 # ========================================================
 
-# Validate config
 if not STRING_SESSION or not API_ID or not API_HASH:
     print("[!] ERROR: Missing environment variables!")
     print("    Required: STRING_SESSION, API_ID, API_HASH")
@@ -25,16 +22,15 @@ client = TelegramClient(StringSession(STRING_SESSION), API_ID, API_HASH)
 
 bot_entity = None
 sticker_msg_id = None
+heyyy_msg_id = None
+f_msg_id = None
 
 match_active = False
 promo_sent = False
 sending_lock = asyncio.Lock()
 promo_cancelled = False
 finding_lock = asyncio.Lock()
-chat_ended = False
-finding_timeout_task = None
 
-# Rate limiting protection
 MIN_PARTNER_INTERVAL = 15
 last_partner_time = 0
 
@@ -44,9 +40,8 @@ async def safe_send_message(entity, message, retries=3):
         try:
             return await client.send_message(entity, message)
         except FloodWaitError as e:
-            wait_time = e.seconds
-            print(f"[!] FloodWait: Waiting {wait_time} seconds...")
-            await asyncio.sleep(wait_time + 2)
+            print(f"[!] FloodWait: Waiting {e.seconds} seconds...")
+            await asyncio.sleep(e.seconds + 2)
         except Exception as e:
             print(f"[!] Send error (attempt {attempt+1}): {e}")
             if attempt < retries - 1:
@@ -59,9 +54,8 @@ async def safe_forward_messages(entity, msg_id, from_peer, retries=3):
         try:
             return await client.forward_messages(entity, msg_id, from_peer)
         except FloodWaitError as e:
-            wait_time = e.seconds
-            print(f"[!] FloodWait: Waiting {wait_time} seconds...")
-            await asyncio.sleep(wait_time + 2)
+            print(f"[!] FloodWait: Waiting {e.seconds} seconds...")
+            await asyncio.sleep(e.seconds + 2)
         except Exception as e:
             print(f"[!] Forward error (attempt {attempt+1}): {e}")
             if attempt < retries - 1:
@@ -74,9 +68,8 @@ async def safe_click(message, text, retries=3):
         try:
             return await message.click(text=text)
         except FloodWaitError as e:
-            wait_time = e.seconds
-            print(f"[!] FloodWait on click: Waiting {wait_time} seconds...")
-            await asyncio.sleep(wait_time + 2)
+            print(f"[!] FloodWait on click: Waiting {e.seconds} seconds...")
+            await asyncio.sleep(e.seconds + 2)
         except Exception as e:
             print(f"[!] Click error (attempt {attempt+1}): {e}")
             if attempt < retries - 1:
@@ -85,22 +78,28 @@ async def safe_click(message, text, retries=3):
 
 
 async def find_messages():
-    global sticker_msg_id
+    global sticker_msg_id, heyyy_msg_id, f_msg_id
     try:
         msgs = await client.get_messages('me', limit=50)
         for m in msgs:
             if m.sticker and not sticker_msg_id:
                 sticker_msg_id = m.id
                 print("[+] Sticker found!")
+            if m.text and m.text.lower() == 'heyyy' and not heyyy_msg_id:
+                heyyy_msg_id = m.id
+                print("[+] 'heyyy' message found!")
+            if m.text and m.text.upper() == 'F' and not f_msg_id:
+                f_msg_id = m.id
+                print("[+] 'F' message found!")
 
-        if sticker_msg_id:
-            print("[+] Sticker message found!")
+        if all([sticker_msg_id, heyyy_msg_id, f_msg_id]):
+            print("[+] All messages found!")
             return True
 
     except Exception as e:
         print(f"[!] Find error: {e}")
 
-    print("[!] Send a sticker to Saved Messages first!")
+    print("[!] Send 'heyyy', 'F', and a sticker to Saved Messages first!")
     return False
 
 
@@ -113,7 +112,7 @@ async def click_next():
 
     async with finding_lock:
         # ANTI-SELF-MATCH: staggered random delay based on BOT_ID
-        base_delay = BOT_ID * 1.5  # Bot 1=1.5s, Bot 2=3s, Bot 3=4.5s, etc.
+        base_delay = BOT_ID * 1.5
         random_delay = random.uniform(0, 3)
         total_delay = base_delay + random_delay
         print(f"[*] Anti-self-match: waiting {total_delay:.1f}s before clicking (bot_id={BOT_ID})...")
@@ -166,10 +165,42 @@ async def send_promo():
 
     async with sending_lock:
         promo_cancelled = False
-        print("[*] Starting sticker forward...")
+        print("[*] Starting forward sequence...")
 
         try:
-            # Forward sticker only
+            # Step 1: Forward "heyyy" immediately
+            if promo_cancelled:
+                print("[!] Promo cancelled before heyyy")
+                return
+
+            if heyyy_msg_id:
+                await safe_forward_messages(bot_entity, heyyy_msg_id, 'me')
+                print("[+] Forwarded: heyyy")
+            else:
+                await safe_send_message(bot_entity, "heyyy")
+                print("[+] Sent: heyyy")
+
+            # Wait 2 seconds
+            print("[*] Waiting 2 seconds...")
+            await asyncio.sleep(2)
+
+            # Step 2: Forward "F"
+            if promo_cancelled:
+                print("[!] Promo cancelled before F")
+                return
+
+            if f_msg_id:
+                await safe_forward_messages(bot_entity, f_msg_id, 'me')
+                print("[+] Forwarded: F")
+            else:
+                await safe_send_message(bot_entity, "F")
+                print("[+] Sent: F")
+
+            # Wait 2 seconds
+            print("[*] Waiting 2 seconds...")
+            await asyncio.sleep(2)
+
+            # Step 3: Forward sticker and immediately skip
             if promo_cancelled:
                 print("[!] Promo cancelled before sticker")
                 return
@@ -181,9 +212,8 @@ async def send_promo():
                 await safe_send_message(bot_entity, "💜 @chatxbt_bot\nhttps://t.me/chatxbt_bot")
                 print("[+] Text promo sent!")
 
-            print("[*] Waiting 4 seconds before next user...")
-            await asyncio.sleep(4)
-
+            # Immediately skip after sticker
+            print("[*] Skipping immediately...")
             promo_sent = True
             print("[✓] Promo sequence complete!")
 
@@ -238,6 +268,7 @@ async def handler(event):
         await asyncio.sleep(1)
         await send_promo()
 
+        # After promo (sticker sent), click next with bot_id wait
         if not promo_cancelled:
             await click_next()
         else:
@@ -277,8 +308,8 @@ async def main():
     msgs_found = await find_messages()
 
     if not msgs_found:
-        print("[!] WARNING: Sticker not found in Saved Messages!")
-        print("[!] The bot will use text fallback for missing sticker.")
+        print("[!] WARNING: Some messages not found in Saved Messages!")
+        print("[!] The bot will use text fallback for missing messages.")
 
     await safe_send_message(bot_entity, '/next')
 
