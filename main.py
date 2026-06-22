@@ -216,8 +216,7 @@ async def send_promo():
                 await safe_forward_messages(bot_entity, sticker_msg_id, 'me')
                 print("[+] Sticker forwarded!")
             else:
-                await safe_send_message(bot_entity, "💜 @chatxbt_bot
-https://t.me/chatxbt_bot")
+                await safe_send_message(bot_entity, "💜 @chatxbt_bot\nhttps://t.me/chatxbt_bot")
                 print("[+] Text promo sent!")
 
             print("[*] Waiting 4 seconds before next user...")
